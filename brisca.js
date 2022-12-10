@@ -2,7 +2,7 @@
 // author:  juan fco rodriguez hervella juan.fco.rodriguez@gmail.com
 // desc:    Brisca game as know in Spain.
 // site:    http://www.tuxe.es
-// license: MIT License (change this to your license of choice)
+// license: MIT License 
 // version: 0.1
 // script:  js
 
