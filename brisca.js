@@ -9,20 +9,26 @@
 var groups = ['oros', 'copas', 'espadas', 'bastos'];
 
 var Game = {
- cards: [],
- triunfo: '',
- turno: '',
- playerCards: [],
- computerCards: [],
- p1Score: 0,
- comScore: 0,
- cursor: '',
- handWinner: '',
+	cards: [],
+	triunfo: '',
+	turno: '',
+	playerCards: [],
+	computerCards: [],
+	p1Score: 0,
+	comScore: 0,
+	cursor: '',
+	handWinner: '',
+	p1PlayedCard: false,
+	comPlayedCard: false,
+	p1PlayedSlot: '',
+	comPlayedSlot: '',
+	whoPlayedFirst: false,
+	handWinner: false,
  
- getCard: function(index, group) {
- 	var card = this.findCard(index, group);
-  return card;
- },
+	getCard: function(index, group) {
+		var card = this.findCard(index, group);
+		return card;
+	},
 	
 	findCard: function(index, group) {
 		var i = 0;
@@ -47,7 +53,7 @@ var Game = {
 	},
 	
 	spawnCards: function() {
-	 this.cards = [];
+	 	this.cards = [];
 		
 		for(var i = 0; i < groups.length; i++) {
 		 var group = groups[i];
@@ -57,94 +63,211 @@ var Game = {
 		}
 	},
 	
-	mangleCards: function() {
-		// TODO
+	shuffleCards: function() {
+		var tmp, current, top = this.cards.length;
+		if(top) while(--top) {
+			current = Math.floor(Math.random() * (top + 1));
+			tmp = this.cards[current];
+			this.cards[current] = this.cards[top];
+			this.cards[top] = tmp;
+		}
+	},
+
+	popFromBarajaToPos: function(turno, pos) {
+		var positionsP1 = [[0,88], [5*8,88], [10*8, 88]];
+		var positionsCOM = [[0,0], [5*8, 0], [10*8, 0]];
+
+		var current = '';
+		if(turno == 'player') {
+			current = positionsP1[pos];
+		}
+		else {
+			current = positionsCOM[pos];
+		}
+
+		var card = this.cards.pop();
+		card.x = current[0];
+		card.y = current[1];
+
+		if(turno == 'player') {
+			card.hide = false;
+			this.playerCards[pos] = card;
+		}
+		else {
+			card.hide = true;
+			this.computerCards[pos] = card;
+		}
 	},
 	
-	setup: function() {
-	 this.p1Score = 0;
+	setupGame: function() {
+	 	this.p1Score = 0;
 		this.comScore = 0;
-	 this.spawnCards();
-		this.mangleCards();
+	 	this.spawnCards();
+		this.shuffleCards();
 		
+		this.p1PlayedCard = false;
+		this.comPlayedCard = false;
 		this.turno = 'player';
-		
+		this.whoPlayedFirst = false;
+		this.handWinner = false;
+
 		// Player cards
 		this.playerCards = [];
 		
-		var card = this.cards.pop();
-		card.x = 0;
-		card.y = 88;
-		card.hide = false;
-		this.playerCards.push(card);
+		this.popFromBarajaToPos('player', 0);
+		this.popFromBarajaToPos('player', 1);
+		this.popFromBarajaToPos('player', 2);
 		
-		var card = this.cards.pop();
-		card.x = 5*8;
-		card.y = 88;
-		card.hide = false;
-		this.playerCards.push(card);
-
-		var card = this.cards.pop();
-		card.x = 10*8;
-		card.y = 88;
-		card.hide = false;
-		this.playerCards.push(card);
-
-  // computerCards
+  		// computerCards
 		this.computerCards = [];
 		
-		var card = this.cards.pop();
-		card.x = 0;
-		card.y = 0;
-		card.hide = true;
-		this.computerCards.push(card);
-		
-		var card = this.cards.pop();
-		card.x = 5*8;
-		card.y = 0;
-		card.hide = true;
-		this.computerCards.push(card);
-
-		var card = this.cards.pop();
-		card.x = 10*8;
-		card.y = 0;
-		card.hide = true;
-		this.computerCards.push(card);
-				
+		this.popFromBarajaToPos('computer', 0);
+		this.popFromBarajaToPos('computer', 1);
+		this.popFromBarajaToPos('computer', 2);
 
 		this.triunfo = this.cards.pop();
 		this.cursor = new Cursor(this);
 	},
-	
-	computerMove: function() {
-			var card = this.computerCards[0];
-			card.x = 21*8;
-			card.y = 9*8;
-			card.hide = false;
+
+	setupNewHand() {
+		this.p1PlayedCard = false;
+		this.comPlayedCard = false;
+		this.whoPlayedFirst = false;
+		this.turno = this.handWinner;
+		this.handWinner = false;
+
+		this.popFromBarajaToPos('computer', this.comPlayedSlot);
+		this.popFromBarajaToPos('player', this.p1PlayedSlot);
+
+		this.comPlayedSlot = '';
+		this.p1PlayedSlot = '';
 	},
 	
-	updateHandWinner: function() {
-	},
-	
-	updateScores: function() {
-	},
-	
-	update: function() {
-		this.cursor.update();
+	setHandWinner: function() {
+		var p1Points = this.p1PlayedCard.getPoints();
+		var p1Group = this.p1PlayedCard.group;
+
+		var comPoints = this.comPlayedCard.getPoints();
+		var comGroup = this.comPlayedCard.group;
+
+		var triunfoGroup = this.triunfo.group;
+
+		if((p1Group != triunfoGroup && comGroup != triunfoGroup) ||
+			(p1Group == triunfoGroup && comGroup == triunfoGroup)) {
+
+			if(p1Group == comGroup) {
+				if(p1Points > comPoints) {
+					this.handWinner = 'player';
+				}
+				else {
+					this.handWinner = 'computer';
+				}
+			}
+			else {
+				this.handWinner = this.whoPlayedFirst;
+			}
+		}
+		else if(p1Group == triunfoGroup) {
+			this.handWinner = 'player';
+		}
+		else if(comGroup == triunfoGroup) {
+			this.handWinner = 'computer';
+		}
 		
-		if(this.turno == 'computer') {
-			this.computerMove();
-			this.updateHandWinner();
-			this.updateScores();	
+	},
+
+	updateScores: function() {
+		var total = this.p1PlayedCard.getPoints() + this.comPlayedCard.getPoints();
+		if(this.handWinner == 'player') {
+			this.p1Score += total;
+		}
+		else {
+			this.comScore += total;
 		}
 	},
+
 	
-	playCallback: function(cursorIndex) {
+	update: function() {
+		if(this.turno == 'player') {
+			if(! this.whoPlayedFirst) {
+				this.whoPlayedFirst = 'player';
+			}
+			this.cursor.update();
+		}
+		
+		if(this.turno == 'computer') {
+			if(! this.whoPlayedFirst) {
+				this.whoPlayedFirst = 'computer';
+			}
+			this.computerMove();
+		}
+
+		if(this.p1PlayedCard && this.comPlayedCard && this.turno == 'end') {
+			this.setHandWinner();
+			this.updateScores();	
+			
+			this.turno = 'waiting';
+		}
+
+		if(this.turno == 'waiting') {
+			// bouton A or key Z
+			if(btnp(0)) {
+				this.setupNewHand();
+			}
+		}
+
+	},
+	
+	guessBestComputerMove: function() {
+		return 0;
+		/*
+		if(this.p1PlayedCard) {
+			if(this.p1PlayedCard.group == this.triunfo.group) {
+				p1Points = this.p1PlayedCard.getPoints();
+			}
+			else {
+
+			}
+		}
+		else {
+			this.computerCards[0].group
+		}
+		*/
+	},
+
+	playerMove: function(cursorIndex) {
 		var card = this.playerCards[cursorIndex];
 		card.x = 16*8;
 		card.y = 9*8;
 		
-		this.turno = 'computer';
+		this.p1PlayedCard = card;
+		this.p1PlayedSlot = cursorIndex;
+		
+		if(! this.comPlayedCard) {
+			this.turno = 'computer';
+		}
+		else {
+			this.turno = 'end';
+		}
+	},
+
+	computerMove: function() {
+		var pos = this.guessBestComputerMove();
+
+		var card = this.computerCards[pos];
+		card.x = 21*8;
+		card.y = 9*8;
+		card.hide = false;
+
+		this.comPlayedCard = card;
+		this.comPlayedSlot = pos;
+
+		if(! this.p1PlayedCard) {
+			this.turno = 'player';
+		}
+		else {
+			this.turno = 'end';
+		}
 	},
 	
 	render: function() {
@@ -165,11 +288,27 @@ var Game = {
 		
 		this.cursor.render();
 		
-		if(this.turno == 'computer') {
-			
+		if(this.turno == 'waiting') {
+			this.renderWinnerMessage(t);
 		}
 	},
 	
+	renderWinnerMessage: function() {
+		if(this.handWinner == 'player') {
+			message = 'You win !!';
+			bg_color = 11;
+			fg_color = 6;
+		}
+		else {
+			message = 'You lose :(';
+			bg_color = 2;
+			fg_color = 12;
+		}
+
+		rect(50, 20, 70, 15, bg_color);
+		print(message, 55, 25, fg_color, false, 1, false);
+	},
+
 	renderScores: function() {
 		print('P1  score: ' + this.p1Score,2,60,12,true,1,true);
 		print('COM score: ' + this.comScore,2,70,12,true,1,true);
@@ -217,8 +356,8 @@ var Game = {
 }
 
 var Cursor = function(Game) {
- this.game = Game;
- this.pos = [[0,11*8],[5*8,11*8],[10*8,11*8]];
+ 	this.game = Game;
+ 	this.pos = [[0,11*8],[5*8,11*8],[10*8,11*8]];
 	this.index = 0;
 	
 	this.update = function() {
@@ -226,7 +365,7 @@ var Cursor = function(Game) {
 			return;
 		}
 		
-	 // right ->
+	 	// right ->
 		if(btnp(3)) {
 			this.index = this.index + 1;
 			if(this.index == 3) {
@@ -244,7 +383,7 @@ var Cursor = function(Game) {
 		
 		// button A or key Z
 		if(btnp(4)) {
-			this.game.playCallback(this.index);
+			this.game.playerMove(this.index);
 		}
 	}
 	
@@ -265,13 +404,18 @@ var Card = function(index, group) {
 	this.y = 0;
 	this.blankSpr = 144;
 	this.hide = false;
-	
+
+	this.getPoints = function() {
+		var points = [11,0,10,0,0,0,0,2,3,4];
+		return points[this.index];
+	}
+
 	this.render = function() {
 
-  if(this.hide) {
-  	this.renderHide();
-   return;
-  }
+		if(this.hide) {
+			this.renderHide();
+			return;
+		}
   
 		if(this.index == 0) {
 			this.renderAS();	
@@ -495,7 +639,7 @@ function selfTest(t) {
 	}
 }
 
-Game.setup();
+Game.setupGame();
 
 var t = 0;
 
