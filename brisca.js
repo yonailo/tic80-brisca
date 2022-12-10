@@ -56,7 +56,7 @@ var Game = {
 	 	this.cards = [];
 		
 		for(var i = 0; i < groups.length; i++) {
-		 var group = groups[0];
+		 var group = groups[i];
 			for(var j = 0; j < 10; j++) {
 				this.cards.push(new Card(j, group));
 			}
@@ -127,7 +127,7 @@ var Game = {
 		
 		this.p1PlayedCard = false;
 		this.comPlayedCard = false;
-		this.turno = 'player';
+		this.turno = 'new_game';
 		this.whoPlayedFirst = false;
 		this.handWinner = false;
 
@@ -248,46 +248,186 @@ var Game = {
 		}
 
 		if(this.turno == 'waiting') {
-			// bouton A or key Z
+			// UP
 			if(btnp(0)) {
 				this.setupNewHand();
 			}
 		}
 
 		if(this.turno == 'game_over') {
+			// UP
 			if(btnp(0)) {
 				this.setupGame();
 			}
 		}
+
+		if(this.turno == 'new_game') {
+			// UP
+			if(btnp(0)) {
+				this.turno = 'player';
+			}
+		}
 	},
 	
-	guessBestComputerMove: function() {
+	selectLessPointsAndNotTriunfo: function() {
+		
+		var points = 999;
+		var pos = -1;
 
-		if(this.computerCards[0]) {
-			return 0;
+		for(var i = 0; i < this.computerCards.length; i++) {
+			var card = this.computerCards[i];
+			if(! card) {
+				continue;
+			}
+
+			card_points = card.getPoints();
+			if(card_points < points) {
+				if(card.group != this.triunfo.group) {
+					if(card_points != 11 && card_points != 10) {
+						points = card_points;
+						pos = i;
+					}
+				}
+			}
 		}
 
-		if(this.computerCards[1]) {
-			return 1;
+		if(pos != -1) {
+			return pos;
 		}
 
-		if(this.computerCards[2]) {
-			return 2;
+		for(var i = 0; i < this.computerCards.length; i++) {
+			var card = this.computerCards[i];
+			if(! card) {
+				continue;
+			}
+
+			card_points = card.getPoints();
+			if(card_points < points) {
+				points = card_points;
+				pos = i;
+			}
 		}
 
-		/*
-		if(this.p1PlayedCard) {
-			if(this.p1PlayedCard.group == this.triunfo.group) {
-				p1Points = this.p1PlayedCard.getPoints();
+		if(pos == -1) {
+			for(var i = 0; i < this.computerCards.length; i++) {
+				var card = this.computerCards[i];
+				if(! card) {
+					continue;
+				}
+
+				pos = i;
+			}
+		}
+
+		return pos;
+	},
+
+	tryToWin: function() {
+		var p1Points = this.p1PlayedCard.getPoints();
+		var p1Index = this.p1PlayedCard.index;
+		var p1Group = this.p1PlayedCard.group;
+
+		var pos = -1;
+		var points = 0;
+
+		// Tries to win with a card of the same group
+		for(var i = 0; i < this.computerCards.length; i++) {
+			var card = this.computerCards[i];
+			if(! card) {
+				continue;
+			}
+
+			if(card.group == p1Group) {
+				if(card.getPoints() > p1Points) {
+					if(pos != -1) {
+						if(card.getPoints() > points) {
+							pos = i;
+							points = card.getPoints();
+						}
+					} 
+					else {
+						pos = i;
+						points = card.getPoints();
+					}
+				}
+				else if(p1Points == 0) {
+					if(card.index > p1Index) {
+						pos = i;
+					}
+				}
+			}
+		}
+
+		if(pos != -1) {
+			return pos;
+		}
+
+		// Tries to win with a triunfo
+		for(var i = 0; i < this.computerCards.length; i++) {
+			var card = this.computerCards[i];
+			if(! card) {
+				continue;
+			}
+
+			if(card.group == this.triunfo.group) {
+				if(p1Group == this.triunfo.group) {
+					if(card.getPoints() > p1Points) {
+						pos = i;
+					}
+				}
+				else {
+					if(pos != -1) {
+						if(card.getPoints() < this.computerCards[pos].getPoints()) {
+							pos = i;
+						}
+					}
+					else {
+						if(p1Points == 10 || p1Points == 11) {
+							pos = i;
+						}
+						else {
+							if(card.getPoints() != 10 && card.getPoints() != 11) {
+								pos = i;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if(pos != -1) {
+			return pos;
+		}
+
+		// Tries to lose the miminum number of points
+		return this.selectLessPointsAndNotTriunfo();
+	},
+
+	selectWinnerHand: function() {
+
+		var p1Points = this.p1PlayedCard.getPoints();
+
+		if(this.p1PlayedCard.group == this.triunfo.group) {	
+			if(p1Points == 0) {
+				return this.selectLessPointsAndNotTriunfo();
 			}
 			else {
-
+				return this.tryToWin();
 			}
 		}
 		else {
-			this.computerCards[0].group
+			return this.tryToWin();
 		}
-		*/
+	},
+
+	guessBestComputerMove: function() {
+
+		if(! this.p1PlayedCard)  {
+			return this.selectLessPointsAndNotTriunfo();		
+		}
+		else {
+			return this.selectWinnerHand();
+		}
 	},
 
 	isGameOver: function() {
@@ -308,6 +448,10 @@ var Game = {
 
 	playerMove: function(cursorIndex) {
 		
+		if(this.whoPlayedFirst == 'player') {
+			sfx(0,'B-5',10);
+		}
+
 		var card = this.playerCards[cursorIndex];
 		if(! card || card.played) {
 			return;
@@ -329,8 +473,11 @@ var Game = {
 
 	computerMove: function() {
 
+		if(this.whoPlayedFirst == 'computer') {
+			sfx(0,'C-3',10);
+		}
+
 		var pos = this.guessBestComputerMove();
-		trace('computer plays ' + pos);
 
 		var card = this.computerCards[pos];
 		card.x = 21*8;
@@ -374,8 +521,20 @@ var Game = {
 		if(this.turno == 'game_over') {
 			this.renderGameOver();
 		}
+
+		if(this.turno == 'new_game') {
+			this.renderNewGame();
+		}
 	},
 	
+	renderNewGame: function() {
+		rect(50, 20, 150, 100, 11);
+		print('Choose cards with arrow ', 55, 30, 6, false, 1, false);
+		print('keys. Z to play, UP to ', 55, 40, 6, false, 1, false);
+		print('continue.', 55, 50, 6, false, 1, false);
+		print('GOOD LUCK !!', 70, 80, 6, false, 1, false);
+	},
+
 	renderWinnerMessage: function() {
 		if(this.handWinner == 'player') {
 			message = 'You win !!';
@@ -522,8 +681,10 @@ var Card = function(index, group) {
 	this.render = function() {
 
 		if(this.hide) {
-			this.renderHide();
-			return;
+			if(! key(16)) {
+				this.renderHide();
+				return;
+			}
 		}
   
 		if(this.index == 0) {
@@ -734,7 +895,7 @@ function selfTest(t) {
  
 	for(var i = 0; i < 10; i++) {
 		var card = Game.getCard(i, group_name);
-	 card.hide = hide;	
+	 	card.hide = hide;	
 		card.x = x;
 		card.y = y;
 		card.render();
@@ -983,7 +1144,7 @@ function TIC()
 // </WAVES>
 
 // <SFX>
-// 000:000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000304000000000
+// 000:000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000
 // </SFX>
 
 // <TRACKS>
